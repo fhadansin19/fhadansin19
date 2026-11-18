@@ -88,7 +88,8 @@ input double          InpMartiMult        = 1.5;          // After loss: lot mul
 input int             InpMartiMaxSteps    = 2;            // After loss: max steps
 
 input group "=== Risk control / ควบคุมความเสี่ยง ==="
-input int             InpMaxSpreadPts     = 30;           // Max spread (points)
+input int             InpMaxSpreadPts     = 0;            // Max spread points (0 = auto from ATR)
+input double          InpMaxSpreadATRPct  = 12.0;         // Auto: max spread as % of ATR
 input double          InpDailyTargetPct   = 3.0;          // Daily profit target % (0 = off)
 input bool            InpCloseAtTarget    = false;        // Close all when daily target hit
 input double          InpDailyMaxLossPct  = 5.0;          // Daily max loss % (0 = off)
@@ -411,7 +412,32 @@ bool IsNewBar()
    return true;
   }
 
-bool SpreadOK() { return (Ask() - Bid()) / _Point <= InpMaxSpreadPts; }
+double SpreadLimitPts()
+  {
+   if(InpMaxSpreadPts > 0) return InpMaxSpreadPts;
+   if(g_atr <= 0) return 0;
+   return g_atr / _Point * InpMaxSpreadATRPct / 100.0;
+  }
+bool SpreadOK() { double lim = SpreadLimitPts(); return lim > 0 && (Ask() - Bid()) / _Point <= lim; }
+
+// why auto trading is (not) opening a trade right now - shown on the dashboard
+string AutoStatus(color &clr)
+  {
+   clr = C_MUTED;
+   if(!g_autoTrade)              { clr = C_RED;  return "AUTO is OFF"; }
+   if(g_dayLocked)               { clr = C_GOLD; return "Locked: " + g_lockReason; }
+   if(!g_marketOK)               return "Loading indicators...";
+   if(CountDir(0) > 0)           { clr = C_ACCENT; return "Managing open positions"; }
+   if(!SessionOK())              return "Outside trading hours";
+   if(!SpreadOK())               { clr = C_RED;  return StringFormat("Spread too high (> %.0f pts)", SpreadLimitPts()); }
+   if(g_lastBasketClose > 0 && TimeCurrent() - g_lastBasketClose < InpCooldownBars * PeriodSeconds(InpSignalTF))
+                                 return "Cooldown after last basket";
+   if(g_trend == 0)              return "No clear trend - waiting";
+   if(g_adx < InpADXMin)         return StringFormat("ADX %.1f < %.0f - trend too weak", g_adx, InpADXMin);
+   if(g_signal != 0)             { clr = C_GREEN; return "Signal! entering next tick"; }
+   clr = C_TEXT;
+   return (g_trend == 1 ? "Uptrend" : "Downtrend") + string(" - waiting for pullback");
+  }
 
 bool SessionOK()
   {
@@ -1105,7 +1131,8 @@ void BuildPanel()
    Section("sec_m", x, cy, w, "MARKET"); cy += 18;
    KV("m_trend", xl1, xr1, cy, "Trend");     KV("m_adx", xl2, xr2, cy, "ADX");        cy += 17;
    KV("m_rsi",   xl1, xr1, cy, "RSI");       KV("m_atr", xl2, xr2, cy, "ATR");        cy += 17;
-   KV("m_spr",   xl1, xr1, cy, "Spread");    KV("m_sig", xl2, xr2, cy, "Signal");     cy += 22;
+   KV("m_spr",   xl1, xr1, cy, "Spread");    KV("m_sig", xl2, xr2, cy, "Signal");     cy += 17;
+   KV("m_auto",  xl1, xr2, cy, "Auto status");                                          cy += 22;
 
    Section("sec_p", x, cy, w, "POSITIONS"); cy += 18;
    KV("p_buy",   xl1, xr1, cy, "Buy");       KV("p_sell", xl2, xr2, cy, "Sell");      cy += 17;
@@ -1294,7 +1321,9 @@ void UpdatePanel(const bool force = false)
    SetText("m_rsi_v", DoubleToString(g_rsi1, 1));
    SetText("m_atr_v", DoubleToString(g_atr / _Point, 0) + " pts");
    double spr = (Ask() - Bid()) / _Point;
-   SetText("m_spr_v", DoubleToString(spr, 0) + " pts", spr <= InpMaxSpreadPts ? C_TEXT : C_RED);
+   SetText("m_spr_v", StringFormat("%.0f / %.0f pts", spr, SpreadLimitPts()), SpreadOK() ? C_TEXT : C_RED);
+   color ac; string as = AutoStatus(ac);
+   SetText("m_auto_v", as, ac);
    SetText("m_sig_v", g_signal == 1 ? "BUY SETUP" : (g_signal == -1 ? "SELL SETUP" : "WAIT"),
            g_signal == 1 ? C_GREEN : (g_signal == -1 ? C_RED : C_MUTED));
 

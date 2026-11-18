@@ -55,7 +55,7 @@
 | พารามิเตอร์ | ค่าเริ่มต้น | หมายเหตุ |
 |---|---|---|
 | `InpLotMode` / `InpRiskPercent` | Risk 1% | ความเสี่ยงกรณีแย่สุดของทั้งตะกร้า (รวมไม้ Grid ทุกชั้นแล้ว) |
-| `InpMaxSpreadPts` | 30 | ทองคำ (XAUUSD) มักต้องตั้งสูงกว่านี้ เช่น 40–60 |
+| `InpMaxSpreadPts` / `InpMaxSpreadATRPct` | 0 (อัตโนมัติ) / 12% | 0 = ให้ EA คำนวณสเปรดสูงสุดจาก ATR เอง (ใช้ได้ทั้งทองและค่าเงิน) |
 | `InpRecoveryMode` | Both | ตั้ง `Off` ได้ถ้าไม่ต้องการแก้ไม้ |
 | `InpRecStepATR` × `InpRecMaxLevels` | 1.0 × 3 | ผลคูณต้องน้อยกว่า `InpRecBasketSL_ATR` (5.0) |
 | `InpTP1_ATR` / `TP2` / `TP3` | 1 / 2 / 3.5 | ต้องเรียงจากน้อยไปมาก |
